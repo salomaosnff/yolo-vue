@@ -74,6 +74,8 @@ async function loop() {
     shape: frame.shape
   }])
 
+  frame.dispose()
+
   draw.clearRect(0, 0, canvas.value.width, canvas.value.height)
 
   draw.drawImage(video, 0, 0, canvas.value.width, canvas.value.height)

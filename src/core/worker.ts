@@ -74,10 +74,12 @@ async function loop() {
     // Detecta os objetos no frame
     const result = await Detector.detect(tensor as unknown as tf.TensorLike)
 
+    tensor.dispose()
+
     // Envia o resultado para a interface
     globalThis.postMessage(['result', result])
 
-    // Aguarda 100ms para processar o próximo frame
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // Aguarda 1/30 de segundo para processar o próximo frame
+    await new Promise((resolve) => setTimeout(resolve, 1000 / 30))
   }
 }

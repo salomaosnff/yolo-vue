@@ -51,7 +51,7 @@ export class Detector {
     })
 
     const dummyInput = tf.ones(yolov7.inputs[0].shape ?? []);
-    const warmupResult = await yolov7.executeAsync(dummyInput);
+    const warmupResult = yolov7.execute(dummyInput);
 
     tf.dispose(warmupResult);
     tf.dispose(dummyInput);
@@ -83,9 +83,11 @@ export class Detector {
       .expandDims(0)
     )
 
-    let result = await this.yolov7.executeAsync(input) as tf.Tensor
+    let result = this.yolov7.execute(input) as tf.Tensor
 
     let res = (result.arraySync() as any[])[0]
+
+    result.dispose()
 
     const detections = non_max_suppression(res)
 
