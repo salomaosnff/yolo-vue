@@ -12,6 +12,7 @@
     "@tensorflow/tfjs": "^4.12.0",
     "@tensorflow/tfjs-backend-wasm": "^4.12.0",
     "@tensorflow/tfjs-backend-webgl": "^4.12.0",
+    "@vueuse/core": "^10.5.0",
     "vue": "^3.3.4",
     "vue-router": "^4.2.5"
   },

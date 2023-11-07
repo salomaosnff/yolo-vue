@@ -2,23 +2,27 @@
 import * as tf from '@tensorflow/tfjs'
 import '@tensorflow/tfjs-backend-wasm'
 
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { computed, onUnmounted, ref, watch, watchEffect } from 'vue';
 import { BoundingBox } from '../core/Detector';
 import DetectorWorker from '../core/worker?worker'
+import { useDevicesList, useLocalStorage } from '@vueuse/core'
+
+const { videoInputs } = useDevicesList({
+  requestPermissions: true,
+  constraints: {
+    video: true,
+    audio: false
+  }
+})
 
 const worker = new DetectorWorker()
 let boundingBoxes: BoundingBox[] = []
 
-const devices = ref<{
-  id: string,
-  name: string
-}[]>([])
+const input = useLocalStorage('input', '')
 
-const input = computed({
-  get: () => localStorage.getItem('input') ?? '',
-  set: (value) => localStorage.setItem('input', value),
-});
-
+watchEffect(() => {
+  input.value ??= videoInputs.value[0]?.deviceId
+})
 
 const LISTENERS: Record<string, Function> = {
   progress(_: any, value: number) {
@@ -112,9 +116,9 @@ onUnmounted(() => {
 })
 
 // Seleciona a primeira câmera disponível
-watch(devices, (devices) => {
+watch(videoInputs, (devices) => {
   if (devices.length > 0 && !input.value) {
-    input.value = devices[0].id
+    input.value = devices[0].deviceId
   }
 }, { immediate: true })
 
@@ -146,22 +150,15 @@ watch(input, async (input) => {
 }, {
   immediate: true
 })
-
-// Lista as câmeras disponíveis
-navigator.mediaDevices.enumerateDevices().then(dev => {
-  devices.value = dev.filter(d => d.kind === 'videoinput').map(d => ({
-    id: d.deviceId,
-    name: d.label ?? d.deviceId
-  }))
-})
 </script>
 
 <template>
   <div class="container mx-auto">
     <div class="flex mb-4">
       <select v-model="input" class="px-4 py-2">
-        <option disabled selected>Câmera</option>
-        <option v-for="device in devices" :key="device.id" :value="device.id">{{ device.name }}</option>
+        <option disabled selected value="">Câmera</option>
+        <option v-for="device in videoInputs" :key="device.deviceId" :value="device.deviceId">{{ device.label ??
+          device.deviceId }}</option>
       </select>
     </div>
     <template v-if="!ready">
