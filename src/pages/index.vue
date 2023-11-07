@@ -7,6 +7,7 @@ import { BoundingBox } from '../core/Detector';
 import DetectorWorker from '../core/worker?worker'
 
 const worker = new DetectorWorker()
+let boundingBoxes: BoundingBox[] = []
 
 const devices = ref<{
   id: string,
@@ -18,18 +19,13 @@ const input = computed({
   set: (value) => localStorage.setItem('input', value),
 });
 
-watch(devices, (devices) => {
-  if (devices.length > 0 && !input.value) {
-    input.value = devices[0].id
-  }
-}, { immediate: true })
 
 const LISTENERS: Record<string, Function> = {
   progress(_: any, value: number) {
     progress.value = value
   },
   result(_: any, boxes: BoundingBox[]) {
-    boundingBoxes.value = boxes
+    boundingBoxes = boxes
   },
   ready: () => {
     ready.value = true
@@ -52,7 +48,6 @@ const video = document.createElement('video')
 const progress = ref(0)
 const canvas = ref<HTMLCanvasElement>()
 const ctx = computed(() => canvas.value?.getContext('2d'))
-const boundingBoxes = shallowRef<BoundingBox[]>([])
 const ready = ref(false)
 
 let nextFrame: number
@@ -80,7 +75,7 @@ async function loop() {
 
   draw.drawImage(video, 0, 0, canvas.value.width, canvas.value.height)
 
-  for (const box of boundingBoxes.value) {
+  for (const box of boundingBoxes) {
     draw.fillStyle = box.color
     draw.strokeStyle = box.color
     draw.lineWidth = 3
@@ -116,13 +111,12 @@ onUnmounted(() => {
   postMessage(['stop'])
 })
 
-// Lista as câmeras disponíveis
-navigator.mediaDevices.enumerateDevices().then(dev => {
-  devices.value = dev.filter(d => d.kind === 'videoinput').map(d => ({
-    id: d.deviceId,
-    name: d.label ?? d.deviceId
-  }))
-})
+// Seleciona a primeira câmera disponível
+watch(devices, (devices) => {
+  if (devices.length > 0 && !input.value) {
+    input.value = devices[0].id
+  }
+}, { immediate: true })
 
 // Inicia a câmera selecionada
 watch(input, async (input) => {
@@ -151,6 +145,14 @@ watch(input, async (input) => {
   }, { once: true })
 }, {
   immediate: true
+})
+
+// Lista as câmeras disponíveis
+navigator.mediaDevices.enumerateDevices().then(dev => {
+  devices.value = dev.filter(d => d.kind === 'videoinput').map(d => ({
+    id: d.deviceId,
+    name: d.label ?? d.deviceId
+  }))
 })
 </script>
 
