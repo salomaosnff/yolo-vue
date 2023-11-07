@@ -49,6 +49,11 @@ worker.postMessage(['load', '/yolov7_web_model/model.json'])
 
 const video = document.createElement('video')
 
+video.playsInline = true
+video.muted = true
+video.autoplay = true
+video.play()
+
 const progress = ref(0)
 const canvas = ref<HTMLCanvasElement>()
 const ctx = computed(() => canvas.value?.getContext('2d'))
@@ -56,6 +61,21 @@ const ready = ref(false)
 
 let nextFrame: number
 let camera: MediaStream
+
+const BOX_STYLE = {
+  box: {
+    borderSize: 3,
+  },
+  label: {
+    fontSize: 16,
+    fontFamily: 'Arial',
+    color: '#fff',
+    padding: {
+      x: 8,
+      y: 4
+    }
+  }
+}
 
 // Loop de renderização do canvas
 async function loop() {
@@ -65,8 +85,12 @@ async function loop() {
     return
   }
 
+  canvas.value!.width = video.videoWidth
+  canvas.value!.height = video.videoHeight
+
   const draw = ctx.value;
   const frame = tf.browser.fromPixels(video)
+  draw.clearRect(0, 0, canvas.value.width, canvas.value.height)
 
   worker.postMessage(['detect', {
     data: frame.dataSync(),
@@ -75,14 +99,21 @@ async function loop() {
 
   frame.dispose()
 
-  draw.clearRect(0, 0, canvas.value.width, canvas.value.height)
 
-  draw.drawImage(video, 0, 0, canvas.value.width, canvas.value.height)
+  draw.drawImage(video, 0, 0)
 
   for (const box of boundingBoxes) {
+    draw.font = `bolder ${BOX_STYLE.label.fontSize}px ${BOX_STYLE.label.fontFamily}`
+
+    draw.textBaseline = 'top'
+    draw.textAlign = 'left'
+    draw.fillStyle = BOX_STYLE.label.color
+    const label = draw.measureText(box.label)
+
     draw.fillStyle = box.color
     draw.strokeStyle = box.color
-    draw.lineWidth = 3
+    draw.lineWidth = BOX_STYLE.box.borderSize
+
     draw.strokeRect(
       box.x,
       box.y,
@@ -90,21 +121,22 @@ async function loop() {
       box.height,
     )
 
-    const label = draw.measureText(box.label)
+    const labelHeight = BOX_STYLE.label.fontSize + (BOX_STYLE.label.padding.y * 2)
 
     draw.fillRect(
-      box.x - 2,
-      box.y - 20,
-      label.width + 10,
-      20,
+      box.x - (BOX_STYLE.box.borderSize / 2),
+      box.y - labelHeight,
+      BOX_STYLE.label.padding.x + label.width + BOX_STYLE.label.padding.x,
+      labelHeight,
     )
 
-    draw.fillStyle = 'white'
+    draw.fillStyle = BOX_STYLE.label.color
     draw.fillText(
       box.label,
-      box.x + 2,
-      box.y - 5,
+      box.x + BOX_STYLE.label.padding.x,
+      box.y - labelHeight + BOX_STYLE.label.padding.y,
     )
+
   }
 }
 
@@ -113,6 +145,7 @@ onUnmounted(() => {
   cancelAnimationFrame(nextFrame)
   camera.getTracks().forEach((track) => track.stop())
   postMessage(['stop'])
+  worker.terminate()
 })
 
 // Seleciona a primeira câmera disponível
@@ -132,21 +165,20 @@ watch(input, async (input) => {
   camera?.getTracks().forEach((track) => track.stop())
 
   // Inicia a nova câmera
-  camera = await navigator.mediaDevices.getUserMedia({
+  camera = input === 'screen' ? await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: false
+  }) : await navigator.mediaDevices.getUserMedia({
     video: {
       deviceId: input
-    }
+    },
+    audio: false
   })
 
   // Inicia o vídeo
   video.srcObject = camera
 
-  // Atualiza o tamanho do canvas
-  video.addEventListener('loadedmetadata', () => {
-    canvas.value!.width = video.videoWidth
-    canvas.value!.height = video.videoHeight
-    video.play()
-  }, { once: true })
+  video.play()
 }, {
   immediate: true
 })
@@ -159,13 +191,14 @@ watch(input, async (input) => {
         <option disabled selected value="">Câmera</option>
         <option v-for="device in videoInputs" :key="device.deviceId" :value="device.deviceId">{{ device.label ??
           device.deviceId }}</option>
+        <option value="screen">Tela</option>
       </select>
     </div>
     <template v-if="!ready">
       <span>Inicializando...</span>
       <progress indeterminate class="block w-full" min="0" max="1" :value="progress" />
     </template>
-    <canvas ref="canvas"></canvas>
+    <canvas ref="canvas" class="max-w-full"></canvas>
 
   </div>
 </template>

@@ -66,7 +66,7 @@ export class Detector {
    * @param frame Frame a ser processado
    * @param threshold Limiar de acerto
    */
-  static async detect(frame: tf.TensorLike, threshold = THRESHOLD
+  static async detect(frame: tf.Tensor, threshold = THRESHOLD
   ): Promise<BoundingBox[]> {
     if (!this.yolov7) {
       throw new Error('Model not loaded')
@@ -76,8 +76,13 @@ export class Detector {
 
     tf.engine().startScope()
 
+    const [frame_height, frame_width] = frame.shape
+
+    const ratio_x = frame_width / model_dim[1]
+    const ratio_y = frame_height / model_dim[0]
+
     const input = tf.tidy(() => tf.image
-      .resizeBilinear(frame, model_dim)
+      .resizeBilinear(frame as any as tf.TensorLike, model_dim)
       .div(255)
       .transpose([2, 0, 1])
       .expandDims(0)
@@ -91,13 +96,15 @@ export class Detector {
 
     const detections = non_max_suppression(res)
 
-    return detections.map(([x, y, width, height, score, classe]) => {
+    return detections.map(([x, y, w, h, score, classe]) => {
+      const width = w * ratio_x
+      const height = h * ratio_y
       return {
         color: getColor(classe),
-        x: x - width / 2,
-        y: y - height / 2,
-        height,
+        x: (x * ratio_x) - (width / 2),
+        y: (y * ratio_y) - (height / 2),
         width,
+        height,
         score,
         label: labels[classe]
       }
@@ -111,6 +118,6 @@ export class Detector {
  * @returns Uma cor em HSL
  */
 function getColor(classe: number) {
-  const hue = classe * 0.41
-  return `hsl(${hue}, 100%, 50%)`
+  const hue = ((1 + Math.sin(classe)) / 2) * 360
+  return `hsl(${hue}deg, 100%, 40%)`
 }
